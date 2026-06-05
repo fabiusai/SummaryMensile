@@ -750,9 +750,9 @@
 
   <script>
     // Calcolo data del mese precedente per il default
-    const today = new Date();
+    var today = new Date();
     // Imposta al primo giorno del mese precedente per evitare bug con giorni come il 31
-    const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    var lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
 
     // Inizializzazione di Flatpickr
     flatpickr("#mese", {
@@ -1133,107 +1133,323 @@
       reader.readAsArrayBuffer(file);
     }
 
-    // Importazione JSON (MULTI-FILE)
-    function importJson(event) {
-      // Usa .files per prendere tutti i file selezionati
-      const files = event.target.files;
-      if (files.length === 0) return;
-
-      const buttons = document.querySelectorAll('.btn');
-      let importBtn;
-      buttons.forEach(b => { if(b.textContent.includes('Importa JSON')) importBtn = b; });
-
-      const original = importBtn ? importBtn.innerHTML : "Importa JSON";
-      if(importBtn) {
-         importBtn.innerHTML = "<i class='fas fa-spinner fa-spin'></i> Caricamento...";
-         importBtn.disabled = true;
-      }
-
-      // Dizionario di Mappatura aggiornato con ENGAGEMENT
-      const jsonMapping = {
-        // --- SEZIONE ISCRITTI (ES1.json) ---
+    // Importazione JSON (MULTI-FILE + INCOLLA JSON)
+    function getJsonMapping() {
+      return {
+        // --- SEZIONE ISCRITTI ---
         "Numero Complessivo Iscritti": "iscritti",
         "Iscritti Facebook": "facebook",
         "Iscritti X (Twitter)": "twitter",
         "Iscritti Linkedin": "linkedin",
+        "Iscritti LinkedIn": "linkedin",
         "Iscritti Instagram": "instagram",
         "Iscritti Whatsapp": "whatsapp",
+        "Iscritti WhatsApp": "whatsapp",
         "Iscritti YouTube": "youtube",
-        
-        // --- SEZIONE POST E CONTENUTI (ES2.json) ---
+
+        // --- SEZIONE POST E CONTENUTI ---
         "Numero post Facebook": "postFacebook",
         "Numero post X (Twitter)": "tweet",
         "Numero post Linkedin": "postLinkedin",
+        "Numero post LinkedIn": "postLinkedin",
         "Numero post Instagram": "postInstagram",
         "Numero post Youtube": "videoYoutube",
+        "Numero post YouTube": "videoYoutube",
         "Numero post Whatsapp": "postWhatsapp",
-        
-        // Best Performer
+        "Numero post WhatsApp": "postWhatsapp",
+
+        // --- BEST PERFORMER ---
         "Argomenti più visualizzati 1": "titolo1",
         "Visualizzazione Argomenti più visualizzati 1": "vis1",
         "Argomenti più visualizzati 2": "titolo2",
         "Visualizzazione Argomenti più visualizzati 2": "vis2",
         "Argomenti più visualizzati 3": "titolo3",
         "Visualizzazione Argomenti più visualizzati 3": "vis3",
-        
-        // Comunicazione Istituzionale
+
+        // --- COMUNICAZIONE ISTITUZIONALE ---
         "Numero post istituzionali": "postIstituzionali",
         "Visualizzazione post istituzionali": "viewsIstituzionali",
         "Like + interazioni post istituzionali": "interazioniIstituzionali",
 
-        // --- SEZIONE ENGAGEMENT (ES3.json) ---
+        // --- CAMPAGNE ATL ---
+        "Numero Campagne ATL": "campagneATL",
+        "Numero campagne ATL": "campagneATL",
+        "Campagne ATL": "campagneATL",
+        "Numero post ADV": "postADV",
+        "Post Pubblicitari (ADV)": "postADV",
+        "Post pubblicitari ADV": "postADV",
+        "Canali ADV": "advChannels",
+        "Canali con attività ADV": "advChannels",
+        "Elenco Campagne": "elencoCampagne",
+        "Elenco campagne": "elencoCampagne",
+        "Impression ATL": "viewsATL",
+        "Impression": "viewsATL",
+        "Utenti Unici ATL": "utentiATL",
+        "Utenti Unici": "utentiATL",
+        "Link Click ATL": "clickATL",
+        "Link Click": "clickATL",
+        "Interazioni Totali ATL": "interazioniATL",
+        "Interazioni Totali": "interazioniATL",
+
+        // --- ENGAGEMENT ---
         "Totale commenti": "commenti",
         "Variazione commenti rispetto al mese precedente": "tendenzaCommenti",
         "Dettaglio Argomenti: Temi trattati Poste Italiane FB: l'argomento con più commenti": "argomentiFacebook",
         "Dettaglio Argomenti: valore in percentuale commenti argomento Temi trattati Poste Italiane FB": "prevalenzaCommenti"
       };
+    }
+
+    function aggiornaCanaliAdv(value) {
+      const checkboxes = document.querySelectorAll('#advChannelsContainer input[type="checkbox"]');
+      const selectedChannels = Array.isArray(value)
+        ? value.map(v => String(v).trim().toLowerCase())
+        : String(value).split(',').map(v => v.trim().toLowerCase());
+
+      const advState = {};
+      checkboxes.forEach(cb => {
+        const checkboxValue = cb.value.toLowerCase();
+        const checkboxShortValue = checkboxValue.replace(' (twitter)', '');
+        cb.checked = selectedChannels.includes(checkboxValue) || selectedChannels.includes(checkboxShortValue);
+        advState[cb.value] = cb.checked;
+      });
+
+      localStorage.setItem('advChannels', JSON.stringify(advState));
+    }
+
+    function applicaJsonData(jsonData) {
+      const jsonMapping = getJsonMapping();
+      let totalFieldsUpdated = 0;
+
+      for (const [key, value] of Object.entries(jsonData)) {
+        const targetId = jsonMapping[key];
+        if (!targetId) continue;
+
+        if (targetId === "advChannels") {
+          aggiornaCanaliAdv(value);
+          totalFieldsUpdated++;
+          continue;
+        }
+
+        const inputElement = document.getElementById(targetId);
+        if (inputElement) {
+          inputElement.value = value;
+          localStorage.setItem(targetId, value);
+          totalFieldsUpdated++;
+        }
+      }
+
+      calcolaTotali();
+      return totalFieldsUpdated;
+    }
+
+    function importJson(event) {
+      const files = event.target.files;
+      if (files.length === 0) return;
+
+      const buttons = document.querySelectorAll('.btn');
+      let importBtn;
+      buttons.forEach(b => { if (b.textContent.includes('Importa JSON')) importBtn = b; });
+
+      const original = importBtn ? importBtn.innerHTML : "Importa JSON";
+      if (importBtn) {
+        importBtn.innerHTML = "<i class='fas fa-spinner fa-spin'></i> Caricamento...";
+        importBtn.disabled = true;
+      }
 
       let filesProcessed = 0;
       let totalFieldsUpdated = 0;
 
-      // Cicla attraverso tutti i file selezionati
       Array.from(files).forEach(file => {
         const reader = new FileReader();
-        
+
         reader.onload = function(e) {
           try {
             const jsonData = JSON.parse(e.target.result);
-            
-            for (const [key, value] of Object.entries(jsonData)) {
-              if (jsonMapping[key]) {
-                 const targetId = jsonMapping[key];
-                 const inputElement = document.getElementById(targetId);
-                 
-                 if (inputElement) {
-                   inputElement.value = value;
-                   totalFieldsUpdated++;
-                 }
-              }
-            }
+            totalFieldsUpdated += applicaJsonData(jsonData);
           } catch (error) {
-            console.error(`Errore importazione file ${file.name}:`, error);
+            console.error('Errore importazione file ' + file.name + ':', error);
+            alert('JSON non valido: ' + file.name);
           } finally {
             filesProcessed++;
-            // Se abbiamo finito di leggere tutti i file
             if (filesProcessed === files.length) {
-                calcolaTotali();
-                
-                if(importBtn) {
-                  importBtn.innerHTML = "<i class='fas fa-check'></i> " + totalFieldsUpdated + " Campi!";
-                  setTimeout(() => {
-                      importBtn.innerHTML = original;
-                      importBtn.disabled = false;
-                  }, 2000);
-                }
-                // Reset input
-                event.target.value = '';
+              if (importBtn) {
+                importBtn.innerHTML = "<i class='fas fa-check'></i> " + totalFieldsUpdated + " Campi!";
+                setTimeout(() => {
+                  importBtn.innerHTML = original;
+                  importBtn.disabled = false;
+                }, 2000);
+              }
+              event.target.value = '';
             }
           }
         };
-        
+
         reader.readAsText(file);
       });
     }
+
+    function parseJsonTollerante(text) {
+      const cleanedText = String(text)
+        .trim()
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/```$/i, '')
+        .trim();
+
+      try {
+        return JSON.parse(cleanedText);
+      } catch (error) {
+        const normalizedText = cleanedText
+          .replace(/\\\[/g, '[')
+          .replace(/\\\]/g, ']');
+        return JSON.parse(normalizedText);
+      }
+    }
+
+    function getPromptCampagneATL() {
+      return [
+        "Analizza l'immagine catturata oppure il PowerPoint caricato e ricava solo i dati utili per alimentare la sezione CAMPAGNE ATL di un report web.",
+        "Se la fonte è un PowerPoint, ricava le informazioni esclusivamente dalla slide 2 della presentazione PPT.",
+        "Restituisci esclusivamente un oggetto JSON valido, senza testo introduttivo, senza markdown e senza commenti.",
+        "Usa esattamente queste chiavi:",
+        "{",
+        "  \"Numero Campagne ATL\": \"\",",
+        "  \"Numero post ADV\": \"\",",
+        "  \"Canali ADV\": [],",
+        "  \"Elenco Campagne\": \"\",",
+        "  \"Impression ATL\": \"\",",
+        "  \"Utenti Unici ATL\": \"\",",
+        "  \"Link Click ATL\": \"\",",
+        "  \"Interazioni Totali ATL\": \"\"",
+        "}",
+        "Per \"Canali ADV\" usa un array con uno o più valori tra: Facebook, Instagram, LinkedIn, X (Twitter), TikTok, YouTube, Whatsapp.",
+        "Scrivi l'array di \"Canali ADV\" con parentesi quadre normali, senza backslash: [\"Facebook\", \"Instagram\"], non \\[\"Facebook\", \"Instagram\"\\].",
+        "Per \"Elenco Campagne\" inserisci i nomi delle campagne in un'unica stringa separandoli solo con virgola e spazio, per esempio: \"Casetta Poste, Tg Poste\".",
+        "Non usare mai il punto e virgola come separatore tra i nomi delle campagne.",
+        "Se un dato non è presente o non è deducibile con sicurezza, lascia il valore come stringa vuota. Mantieni eventuali K, M, punti, virgole o percentuali come presenti nella fonte."
+      ].join("\n");
+    }
+
+    function copyAtlPrompt(btn, event) {
+      if (event) event.stopPropagation();
+
+      const promptText = getPromptCampagneATL();
+      const original = btn.innerHTML;
+
+      function confermaCopia() {
+        btn.innerHTML = "<i class='fas fa-check'></i> Copiato!";
+        setTimeout(() => {
+          btn.innerHTML = original;
+        }, 1500);
+      }
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(promptText).then(confermaCopia).catch(() => {
+          const temp = document.createElement('textarea');
+          temp.value = promptText;
+          document.body.appendChild(temp);
+          temp.select();
+          document.execCommand('copy');
+          document.body.removeChild(temp);
+          confermaCopia();
+        });
+      } else {
+        const temp = document.createElement('textarea');
+        temp.value = promptText;
+        document.body.appendChild(temp);
+        temp.select();
+        document.execCommand('copy');
+        document.body.removeChild(temp);
+        confermaCopia();
+      }
+    }
+
+    function apriModaleJson() {
+      const modal = document.getElementById('jsonPasteModal');
+      const textarea = document.getElementById('jsonPasteText');
+      if (!modal || !textarea) return;
+      modal.style.display = 'flex';
+      textarea.focus();
+    }
+
+    function chiudiModaleJson() {
+      const modal = document.getElementById('jsonPasteModal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function applicaJsonIncollato(btn) {
+      const textarea = document.getElementById('jsonPasteText');
+      if (!textarea) return;
+
+      const original = btn ? btn.innerHTML : '';
+
+      try {
+        const jsonData = parseJsonTollerante(textarea.value);
+        const totalFieldsUpdated = applicaJsonData(jsonData);
+
+        if (btn) btn.innerHTML = "<i class='fas fa-check'></i> " + totalFieldsUpdated + " Campi!";
+        setTimeout(() => {
+          if (btn) btn.innerHTML = original;
+          textarea.value = '';
+          chiudiModaleJson();
+        }, 1200);
+      } catch (error) {
+        if (btn) {
+          btn.innerHTML = "<i class='fas fa-triangle-exclamation'></i> JSON non valido";
+          setTimeout(() => { btn.innerHTML = original; }, 1800);
+        } else {
+          alert('JSON non valido. Controlla il testo incollato.');
+        }
+      }
+    }
+
+    function aggiungiInterfacciaJson() {
+      const importJsonBtn = Array.from(document.querySelectorAll('.btn')).find(b => b.textContent.includes('Importa JSON'));
+
+      if (importJsonBtn && !document.getElementById('btnIncollaJson')) {
+        const pasteBtn = document.createElement('button');
+        pasteBtn.id = 'btnIncollaJson';
+        pasteBtn.type = 'button';
+        pasteBtn.className = 'btn btn-json';
+        pasteBtn.innerHTML = "<i class='fas fa-paste'></i> Incolla JSON";
+        pasteBtn.onclick = apriModaleJson;
+        importJsonBtn.insertAdjacentElement('afterend', pasteBtn);
+      }
+
+      if (!document.getElementById('jsonPasteModal')) {
+        const modal = document.createElement('div');
+        modal.id = 'jsonPasteModal';
+        modal.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:20px;';
+        modal.innerHTML = '<div style="background:#fff;width:min(720px,100%);border-radius:4px;box-shadow:0 10px 30px rgba(0,0,0,.25);overflow:hidden;"><div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #D1D1D1;"><h3 style="margin:0;color:#0146bc;font-size:1.1rem;">Incolla JSON</h3><button type="button" onclick="chiudiModaleJson()" style="border:none;background:transparent;font-size:1.4rem;cursor:pointer;color:#333;">&times;</button></div><div style="padding:20px;"><textarea id="jsonPasteText" rows="12" style="width:100%;resize:vertical;padding:12px;border:1px solid #D1D1D1;border-radius:3px;font-family:monospace;font-size:.95rem;" placeholder=\'{"Numero Campagne ATL":"2","Numero post ADV":"5"}\'></textarea></div><div style="display:flex;gap:10px;justify-content:flex-end;padding:0 20px 20px;"><button type="button" class="btn btn-danger" onclick="chiudiModaleJson()">Annulla</button><button type="button" class="btn btn-json" onclick="applicaJsonIncollato(this)"><i class="fas fa-check"></i> Applica JSON</button></div></div>';
+        document.body.appendChild(modal);
+      }
+    }
+
+    function aggiungiBottonePromptATL() {
+      const header = document.querySelector('#section-atl .section-header');
+      const icon = document.querySelector('#section-atl .accordion-icon');
+
+      if (!header || document.getElementById('copyAtlPromptBtn')) return;
+
+      const btn = document.createElement('button');
+      btn.id = 'copyAtlPromptBtn';
+      btn.type = 'button';
+      btn.className = 'copy-btn';
+      btn.style.marginLeft = 'auto';
+      btn.style.marginRight = '12px';
+      btn.style.padding = '6px 10px';
+      btn.style.fontSize = '0.8rem';
+      btn.innerHTML = "<i class='fas fa-copy'></i> Prompt JSON";
+      btn.onclick = function(event) {
+        copyAtlPrompt(this, event);
+      };
+
+      header.insertBefore(btn, icon);
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      aggiungiBottonePromptATL();
+      aggiungiInterfacciaJson();
+    });
   </script>
 </body>
 </html>
